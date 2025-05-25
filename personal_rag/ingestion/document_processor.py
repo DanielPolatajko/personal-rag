@@ -1,8 +1,7 @@
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
-from typing import List, Dict, Any
+from typing import Any
 import hashlib
-import json
 from datetime import datetime
 import logging
 
@@ -10,9 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class DocumentProcessor:
-    """Process and chunk documents for vector storage."""
-
-    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
+    def __init__(self, chunk_size: int, chunk_overlap: int):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.text_splitter = RecursiveCharacterTextSplitter(
@@ -22,7 +19,7 @@ class DocumentProcessor:
             separators=["\n\n", "\n", ". ", " ", ""],
         )
 
-    def process_blog_post(self, blog_data: Dict[str, Any]) -> List[Document]:
+    def process_blog_post(self, blog_data: dict[str, Any]) -> list[Document]:
         """
         Process a blog post into chunks with metadata.
 
@@ -33,19 +30,14 @@ class DocumentProcessor:
             List of LangChain Document objects ready for vector storage
         """
         try:
-            # Generate unique document ID
             doc_id = self._generate_doc_id(blog_data["url"])
 
-            # Prepare content for chunking
             content = self._prepare_content(blog_data)
 
-            # Split into chunks
             chunks = self._split_content(content)
 
-            # Create Document objects with metadata
             documents = []
             for i, chunk in enumerate(chunks):
-                # Base metadata for all chunks
                 metadata = {
                     "doc_id": doc_id,
                     "chunk_id": f"{doc_id}_chunk_{i}",
@@ -67,7 +59,6 @@ class DocumentProcessor:
                     if isinstance(v, list):
                         metadata[k] = ", ".join(v) if v else ""
 
-                # Add summary to first chunk metadata
                 if i == 0:
                     metadata["summary"] = blog_data.get("summary", "")
 
@@ -82,15 +73,13 @@ class DocumentProcessor:
             logger.error(f"Error processing blog post: {str(e)}")
             return []
 
-    def _prepare_content(self, blog_data: Dict[str, Any]) -> str:
+    def _prepare_content(self, blog_data: dict[str, Any]) -> str:
         """Prepare content for chunking by adding structure."""
         content_parts = []
 
-        # Add title as header if available
         if blog_data.get("title"):
             content_parts.append(f"# {blog_data['title']}\n")
 
-        # Add metadata section
         metadata_parts = []
         if blog_data.get("authors"):
             authors_str = ", ".join(blog_data["authors"])
@@ -106,12 +95,11 @@ class DocumentProcessor:
         if metadata_parts:
             content_parts.append("\n".join(metadata_parts) + "\n")
 
-        # Add main content
         content_parts.append(blog_data.get("content", ""))
 
         return "\n\n".join(content_parts)
 
-    def _split_content(self, content: str) -> List[str]:
+    def _split_content(self, content: str) -> list[str]:
         """Split content into chunks using the text splitter."""
         return self.text_splitter.split_text(content)
 
@@ -119,7 +107,7 @@ class DocumentProcessor:
         """Generate a unique document ID from URL."""
         return hashlib.md5(url.encode()).hexdigest()[:16]
 
-    def get_document_summary(self, documents: List[Document]) -> Dict[str, Any]:
+    def get_document_summary(self, documents: list[Document]) -> dict[str, Any]:
         """Get a summary of processed documents."""
         if not documents:
             return {}
@@ -146,11 +134,9 @@ class DocumentValidator:
     @staticmethod
     def validate_document(document: Document) -> bool:
         """Check if a document is valid for storage."""
-        # Check if content exists and is meaningful
         if not document.page_content or len(document.page_content.strip()) < 50:
             return False
 
-        # Check if required metadata exists
         required_metadata = ["doc_id", "chunk_id", "source", "content_type"]
         for field in required_metadata:
             if field not in document.metadata:
@@ -159,7 +145,7 @@ class DocumentValidator:
         return True
 
     @staticmethod
-    def validate_documents(documents: List[Document]) -> List[Document]:
+    def validate_documents(documents: list[Document]) -> list[Document]:
         """Filter out invalid documents."""
         valid_documents = []
         invalid_count = 0
@@ -174,43 +160,3 @@ class DocumentValidator:
             logger.warning(f"Filtered out {invalid_count} invalid document chunks")
 
         return valid_documents
-
-
-# Utility functions for document management
-def save_document_metadata(documents: List[Document], filepath: str):
-    """Save document metadata to JSON file for reference."""
-    if not documents:
-        return
-
-    processor = DocumentProcessor()
-    summary = processor.get_document_summary(documents)
-
-    # Add chunk-level metadata
-    summary["chunks"] = []
-    for doc in documents:
-        chunk_info = {
-            "chunk_id": doc.metadata.get("chunk_id"),
-            "chunk_index": doc.metadata.get("chunk_index"),
-            "chunk_size": len(doc.page_content),
-            "preview": doc.page_content[:200] + "..."
-            if len(doc.page_content) > 200
-            else doc.page_content,
-        }
-        summary["chunks"].append(chunk_info)
-
-    try:
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(summary, f, indent=2, ensure_ascii=False)
-        logger.info(f"Document metadata saved to {filepath}")
-    except Exception as e:
-        logger.error(f"Error saving metadata: {str(e)}")
-
-
-def load_document_metadata(filepath: str) -> Dict[str, Any]:
-    """Load document metadata from JSON file."""
-    try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading metadata: {str(e)}")
-        return {}

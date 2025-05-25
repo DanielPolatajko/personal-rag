@@ -4,48 +4,46 @@ from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.schema import Document
 from typing import List, Dict, Any, Optional, Tuple
-import os
 import logging
 from pathlib import Path
+import streamlit as st
 
 logger = logging.getLogger(__name__)
 
 
 class VectorStoreManager:
-    """Manage Chroma vector store with HuggingFace embeddings."""
-
     def __init__(
         self,
-        persist_directory: str = "./data/vectorstore",
-        embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
-        collection_name: str = "research_documents",
+        persist_directory: str,
+        embedding_model: str,
+        collection_name: str,
     ):
-        self.persist_directory = Path(persist_directory)
-        self.collection_name = collection_name
+        with st.spinner("Initializing vector store..."):
+            self.persist_directory = Path(persist_directory)
+            self.collection_name = collection_name
 
-        # Create directory if it doesn't exist
-        self.persist_directory.mkdir(parents=True, exist_ok=True)
+            # Create directory if it doesn't exist
+            self.persist_directory.mkdir(parents=True, exist_ok=True)
 
-        # Initialize embeddings (CPU-only)
-        logger.info(f"Loading embedding model: {embedding_model}")
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name=embedding_model,
-            model_kwargs={"device": "cpu"},  # Force CPU usage
-            encode_kwargs={"normalize_embeddings": True},
-        )
+            # Initialize embeddings (CPU-only)
+            logger.info(f"Loading embedding model: {embedding_model}")
+            self.embeddings = HuggingFaceEmbeddings(
+                model_name=embedding_model,
+                model_kwargs={"device": "cpu"},  # Force CPU usage
+                encode_kwargs={"normalize_embeddings": True},
+            )
 
-        # Initialize Chroma client
-        self.chroma_client = chromadb.PersistentClient(
-            path=str(self.persist_directory),
-            settings=Settings(anonymized_telemetry=False, allow_reset=True),
-        )
+            # Initialize Chroma client
+            self.chroma_client = chromadb.PersistentClient(
+                path=str(self.persist_directory),
+                settings=Settings(anonymized_telemetry=False, allow_reset=True),
+            )
 
-        # Initialize vector store
-        self.vector_store = None
-        self._initialize_vector_store()
+            # Initialize vector store
+            self.vector_store = None
+            self._initialize_vector_store()
 
     def _initialize_vector_store(self):
-        """Initialize or load existing vector store."""
         try:
             self.vector_store = Chroma(
                 client=self.chroma_client,
@@ -82,7 +80,6 @@ class VectorStoreManager:
 
             # Delete all chunks
             self.vector_store.delete(ids=results["ids"])
-            self.vector_store.persist()
 
             logger.info(f"Deleted {len(results['ids'])} chunks for document {doc_id}")
             return True
@@ -91,7 +88,7 @@ class VectorStoreManager:
             logger.error(f"Error deleting document {doc_id}: {str(e)}")
             return False
 
-    def list_documents(self) -> List[Dict[str, Any]]:
+    def list_documents(self) -> list[dict[str, Any]]:
         """List all documents in the vector store with metadata."""
         try:
             results = self.vector_store.get()
@@ -123,7 +120,7 @@ class VectorStoreManager:
             logger.error(f"Error listing documents: {str(e)}")
             return []
 
-    def get_collection_stats(self) -> Dict[str, Any]:
+    def get_collection_stats(self) -> dict[str, Any]:
         """Get statistics about the vector store collection."""
         try:
             results = self.vector_store.get()
@@ -178,7 +175,7 @@ class VectorStoreManager:
             logger.error(f"Error resetting collection: {str(e)}")
             return False
 
-    def add_documents(self, documents: List[Document]) -> List[str]:
+    def add_documents(self, documents: list[Document]) -> list[str]:
         """
         Add documents to the vector store.
 
@@ -210,7 +207,7 @@ class VectorStoreManager:
             logger.error(f"Error adding documents to vector store: {str(e)}")
             return []
 
-    def _filter_existing_documents(self, documents: List[Document]) -> List[Document]:
+    def _filter_existing_documents(self, documents: list[Document]) -> list[Document]:
         """Filter out documents that already exist in the vector store."""
         try:
             # Get all existing chunk IDs
@@ -238,8 +235,8 @@ class VectorStoreManager:
             return documents  # Return all if filtering fails
 
     def similarity_search(
-        self, query: str, k: int = 5, filter_dict: Optional[Dict[str, Any]] = None
-    ) -> List[Document]:
+        self, query: str, k: int = 5, filter_dict: dict[str, Any] | None = None
+    ) -> list[Document]:
         """
         Search for similar documents.
 
@@ -267,8 +264,8 @@ class VectorStoreManager:
             return []
 
     def similarity_search_with_score(
-        self, query: str, k: int = 5, filter_dict: Optional[Dict[str, Any]] = None
-    ) -> List[Tuple[Document, float]]:
+        self, query: str, k: int = 5, filter_dict: dict[str, Any] | None = None
+    ) -> list[tuple[Document, float]]:
         """
         Search for similar documents with similarity scores.
 
@@ -299,7 +296,7 @@ class VectorStoreManager:
             logger.error(f"Error performing scored similarity search: {str(e)}")
             return []
 
-    def get_document_by_id(self, doc_id: str) -> List[Document]:
+    def get_document_by_id(self, doc_id: str) -> list[Document]:
         """Get all chunks for a specific document ID."""
         try:
             results = self.vector_store.get(where={"doc_id": doc_id})
@@ -328,27 +325,27 @@ class SearchFilters:
     """Helper class for building search filters."""
 
     @staticmethod
-    def by_content_type(content_type: str) -> Dict[str, str]:
+    def by_content_type(content_type: str) -> dict[str, str]:
         """Filter by content type (e.g., 'blog_post', 'paper')."""
         return {"content_type": content_type}
 
     @staticmethod
-    def by_author(author: str) -> Dict[str, str]:
+    def by_author(author: str) -> dict[str, str]:
         """Filter by author name."""
         return {"authors": {"$contains": author}}
 
     @staticmethod
-    def by_tag(tag: str) -> Dict[str, str]:
+    def by_tag(tag: str) -> dict[str, str]:
         """Filter by tag."""
         return {"tags": {"$contains": tag}}
 
     @staticmethod
-    def by_date_range(start_date: str, end_date: str) -> Dict[str, Dict[str, str]]:
+    def by_date_range(start_date: str, end_date: str) -> dict:
         """Filter by date range (ISO format dates)."""
         return {"publish_date": {"$gte": start_date, "$lte": end_date}}
 
     @staticmethod
-    def combine_filters(*filters: Dict[str, Any]) -> Dict[str, Any]:
+    def combine_filters(*filters: dict[str, Any]) -> dict[str, Any]:
         """Combine multiple filters with AND logic."""
         if not filters:
             return {}

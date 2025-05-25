@@ -3,8 +3,6 @@ from bs4 import BeautifulSoup
 from newspaper import Article
 from readability import Document
 from urllib.parse import urlparse
-from typing import Dict, Optional, List
-import time
 from datetime import datetime
 import logging
 
@@ -14,7 +12,7 @@ logger = logging.getLogger(__name__)
 class BlogScraper:
     """Enhanced blog post scraper with multiple extraction methods."""
 
-    def __init__(self, timeout: int = 30, user_agent: str = "RAG Research Bot 1.0"):
+    def __init__(self, timeout: int, user_agent: str):
         self.timeout = timeout
         self.headers = {
             "User-Agent": user_agent,
@@ -24,7 +22,7 @@ class BlogScraper:
             "Connection": "keep-alive",
         }
 
-    def scrape_blog_post(self, url: str) -> Optional[Dict[str, str]]:
+    def scrape_blog_post(self, url: str) -> dict[str, str] | None:
         """
         Scrape a blog post using multiple methods for best results.
         Returns structured content or None if extraction fails.
@@ -52,7 +50,7 @@ class BlogScraper:
             logger.error(f"Error scraping {url}: {str(e)}")
             return None
 
-    def _extract_with_newspaper(self, url: str) -> Optional[Dict[str, str]]:
+    def _extract_with_newspaper(self, url: str) -> dict[str, str] | None:
         """Extract content using newspaper3k library."""
         try:
             article = Article(url)
@@ -79,7 +77,7 @@ class BlogScraper:
             logger.debug(f"Newspaper extraction failed for {url}: {str(e)}")
             return None
 
-    def _extract_with_readability(self, url: str) -> Optional[Dict[str, str]]:
+    def _extract_with_readability(self, url: str) -> dict[str, str] | None:
         """Extract content using readability library."""
         try:
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
@@ -110,7 +108,7 @@ class BlogScraper:
             logger.debug(f"Readability extraction failed for {url}: {str(e)}")
             return None
 
-    def _extract_with_beautifulsoup(self, url: str) -> Optional[Dict[str, str]]:
+    def _extract_with_beautifulsoup(self, url: str) -> dict[str, str] | None:
         """Basic extraction using BeautifulSoup."""
         try:
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
@@ -161,7 +159,7 @@ class BlogScraper:
             logger.debug(f"BeautifulSoup extraction failed for {url}: {str(e)}")
             return None
 
-    def _extract_title(self, soup: BeautifulSoup) -> Optional[str]:
+    def _extract_title(self, soup: BeautifulSoup) -> str | None:
         """Extract title from HTML."""
         # Try different title sources
         title_selectors = [
@@ -185,7 +183,7 @@ class BlogScraper:
 
         return None
 
-    def _extract_authors(self, soup: BeautifulSoup) -> List[str]:
+    def _extract_authors(self, soup: BeautifulSoup) -> list[str]:
         """Extract author information."""
         author_selectors = [
             ".author",
@@ -205,7 +203,7 @@ class BlogScraper:
 
         return authors
 
-    def _extract_publish_date(self, soup: BeautifulSoup) -> Optional[str]:
+    def _extract_publish_date(self, soup: BeautifulSoup) -> str | None:
         """Extract publication date."""
         date_selectors = [
             "time[datetime]",
@@ -235,7 +233,7 @@ class BlogScraper:
 
         return None
 
-    def _extract_tags(self, soup: BeautifulSoup) -> List[str]:
+    def _extract_tags(self, soup: BeautifulSoup) -> list[str]:
         """Extract tags/categories."""
         tag_selectors = [
             ".tags a",

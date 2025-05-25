@@ -1,8 +1,8 @@
 import streamlit as st
-import os
 from datetime import datetime
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
+from dependency_injector.wiring import inject, Provide
 
 from personal_rag.ingestion.blog_post_scraper import BlogScraper
 from personal_rag.ingestion.document_processor import (
@@ -12,6 +12,7 @@ from personal_rag.ingestion.document_processor import (
 from personal_rag.retrieval.vector_store import VectorStoreManager
 from personal_rag.retrieval.rag import RAGPipeline
 from personal_rag.utils.config import load_config
+from personal_rag.container import Container
 
 from dotenv import load_dotenv
 
@@ -33,58 +34,24 @@ st.set_page_config(
 class RAGApp:
     """Main Streamlit RAG application."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        vector_store_manager: VectorStoreManager,
+        rag_pipeline: RAGPipeline,
+    ):
+        self.vector_store_manager = vector_store_manager
+        self.rag_pipeline = rag_pipeline
         self.config = load_config()
         self.initialize_session_state()
-        self.initialize_components()
 
     def initialize_session_state(self):
         """Initialize Streamlit session state."""
-        if "rag_pipeline" not in st.session_state:
-            st.session_state.rag_pipeline = None
-
-        if "vector_store" not in st.session_state:
-            st.session_state.vector_store = None
 
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = []
 
         if "ingestion_status" not in st.session_state:
             st.session_state.ingestion_status = []
-
-    def initialize_components(self):
-        """Initialize RAG components."""
-        try:
-            # Check for API key
-            anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-            if not anthropic_key:
-                st.error("Please set your ANTHROPIC_API_KEY environment variable.")
-                st.stop()
-
-            # Initialize vector store
-            if st.session_state.vector_store is None:
-                with st.spinner("Initializing vector store..."):
-                    st.session_state.vector_store = VectorStoreManager(
-                        persist_directory=self.config["vector_store"][
-                            "persist_directory"
-                        ],
-                        embedding_model=self.config["embeddings"]["model_name"],
-                    )
-
-            # Initialize RAG pipeline
-            if st.session_state.rag_pipeline is None:
-                with st.spinner("Initializing RAG pipeline..."):
-                    st.session_state.rag_pipeline = RAGPipeline(
-                        anthropic_api_key=anthropic_key,
-                        vector_store_manager=st.session_state.vector_store,
-                        model_name=self.config["llm"]["model_name"],
-                        temperature=self.config["llm"]["temperature"],
-                        max_tokens=self.config["llm"]["max_tokens"],
-                    )
-
-        except Exception as e:
-            st.error(f"Error initializing components: {str(e)}")
-            st.stop()
 
     def run(self):
         """Run the main application."""
@@ -118,10 +85,9 @@ class RAGApp:
         st.sidebar.header("🛠️ Controls")
 
         # Collection statistics
-        if st.session_state.vector_store:
-            stats = st.session_state.vector_store.get_collection_stats()
-            st.sidebar.metric("Documents", stats.get("unique_documents", 0))
-            st.sidebar.metric("Chunks", stats.get("total_chunks", 0))
+        stats = self.vector_store_manager.get_collection_stats()
+        st.sidebar.metric("Documents", stats.get("unique_documents", 0))
+        st.sidebar.metric("Chunks", stats.get("total_chunks", 0))
 
         st.sidebar.divider()
 
@@ -157,7 +123,7 @@ class RAGApp:
         if st.sidebar.button("🗑️ Reset Collection", type="secondary"):
             if st.sidebar.checkbox("Confirm reset"):
                 with st.spinner("Resetting collection..."):
-                    success = st.session_state.vector_store.reset_collection()
+                    success = self.vector_store_manager.reset_collection()
                     if success:
                         st.success("Collection reset successfully!")
                         st.rerun()
@@ -200,7 +166,7 @@ class RAGApp:
 
             with st.chat_message("assistant"):
                 with st.spinner("Searching and generating answer..."):
-                    result = st.session_state.rag_pipeline.query(
+                    result = self.rag_pipeline.query(
                         question=question,
                         k=settings["k"],
                         filters=filters,
@@ -251,18 +217,6 @@ class RAGApp:
         if ingest_button and blog_url:
             self._ingest_blog_post(blog_url)
 
-        # Batch ingestion
-        st.subheader("📋 Batch Ingestion")
-        batch_urls = st.text_area(
-            "Multiple URLs (one per line)",
-            placeholder="https://example.com/post1\nhttps://example.com/post2",
-        )
-
-        if st.button("📥 Ingest All"):
-            urls = [url.strip() for url in batch_urls.split("\n") if url.strip()]
-            if urls:
-                self._ingest_multiple_blog_posts(urls)
-
         # Ingestion status
         if st.session_state.ingestion_status:
             st.subheader("📈 Recent Ingestion Status")
@@ -290,7 +244,7 @@ class RAGApp:
             settings = st.session_state.search_settings
             filters = self._build_filters(settings)
 
-            results = st.session_state.rag_pipeline.search_documents(
+            results = self.rag_pipeline.search_documents(
                 query=search_query,
                 k=settings["k"] * 2,  # Get more results for browsing
                 filters=filters,
@@ -314,7 +268,7 @@ class RAGApp:
                             st.write(
                                 f"**Tags:** {', '.join(result['tags']) if result['tags'] else 'None'}"
                             )
-                            st.write(f"**Content Preview:**")
+                            st.write("**Content Preview:**")
                             st.write(result["content_preview"])
 
                         with col2:
@@ -322,7 +276,7 @@ class RAGApp:
                                 f"**Chunk:** {result['chunk_index'] + 1}/{result['total_chunks']}"
                             )
                             if st.button(
-                                f"View Full Document", key=f"view_{result['doc_id']}"
+                                "View Full Document", key=f"view_{result['doc_id']}"
                             ):
                                 self._show_full_document(result["doc_id"])
                             st.link_button("🔗 Source", result["source"])
@@ -331,7 +285,7 @@ class RAGApp:
 
         # List all documents
         st.subheader("📚 All Documents")
-        documents = st.session_state.vector_store.list_documents()
+        documents = self.vector_store_manager.list_documents()
 
         if documents:
             for doc in documents:
@@ -352,9 +306,7 @@ class RAGApp:
                         if st.button("👁️ View", key=f"view_all_{doc['doc_id']}"):
                             self._show_full_document(doc["doc_id"])
                         if st.button("🗑️ Delete", key=f"delete_{doc['doc_id']}"):
-                            if st.session_state.vector_store.delete_document(
-                                doc["doc_id"]
-                            ):
+                            if self.vector_store_manager.delete_document(doc["doc_id"]):
                                 st.success("Document deleted!")
                                 st.rerun()
                             else:
@@ -369,7 +321,7 @@ class RAGApp:
         """Render statistics and analytics."""
         st.header("📊 Knowledge Base Statistics")
 
-        stats = st.session_state.vector_store.get_collection_stats()
+        stats = self.vector_store_manager.get_collection_stats()
 
         # Overview metrics
         col1, col2, col3, col4 = st.columns(4)
@@ -436,27 +388,24 @@ class RAGApp:
 
         return SearchFilters.combine_filters(*filters) if filters else None
 
-    def _ingest_blog_post(self, url: str):
+    @inject
+    def _ingest_blog_post(
+        self,
+        url: str,
+        blog_scraper: BlogScraper = Provide[Container.blog_scraper],
+        document_processor: DocumentProcessor = Provide[Container.document_processor],
+    ):
         """Ingest a single blog post."""
         with st.spinner(f"Ingesting {url}..."):
             try:
-                # Scrape blog post
-                scraper = BlogScraper()
-                blog_data = scraper.scrape_blog_post(url)
+                blog_data = blog_scraper.scrape_blog_post(url)
 
                 if not blog_data:
                     st.error("Failed to scrape blog post. Please check the URL.")
                     self._log_ingestion_status(url, False, "Scraping failed")
                     return
 
-                # Process into documents
-                processor = DocumentProcessor(
-                    chunk_size=self.config["rag"]["chunk_size"],
-                    chunk_overlap=self.config["rag"]["chunk_overlap"],
-                )
-                documents = processor.process_blog_post(blog_data)
-
-                # Validate documents
+                documents = document_processor.process_blog_post(blog_data)
                 valid_documents = DocumentValidator.validate_documents(documents)
 
                 if not valid_documents:
@@ -464,8 +413,7 @@ class RAGApp:
                     self._log_ingestion_status(url, False, "No valid chunks")
                     return
 
-                # Add to vector store
-                ids = st.session_state.vector_store.add_documents(valid_documents)
+                ids = self.vector_store_manager.add_documents(valid_documents)
 
                 if ids:
                     st.success(
@@ -482,25 +430,9 @@ class RAGApp:
                 st.error(f"Error ingesting document: {str(e)}")
                 self._log_ingestion_status(url, False, f"Error: {str(e)}")
 
-    def _ingest_multiple_blog_posts(self, urls: List[str]):
-        """Ingest multiple blog posts."""
-        progress_bar = st.progress(0)
-        status_container = st.empty()
-
-        for i, url in enumerate(urls):
-            progress = (i + 1) / len(urls)
-            progress_bar.progress(progress)
-            status_container.write(f"Processing {i + 1}/{len(urls)}: {url}")
-
-            self._ingest_blog_post(url)
-
-        progress_bar.empty()
-        status_container.empty()
-        st.success(f"Completed batch ingestion of {len(urls)} URLs")
-
     def _show_full_document(self, doc_id: str):
         """Show full document content in a modal."""
-        doc_content = st.session_state.rag_pipeline.get_document_content(doc_id)
+        doc_content = self.rag_pipeline.get_document_content(doc_id)
 
         if doc_content:
             st.subheader(f"📄 {doc_content['title']}")

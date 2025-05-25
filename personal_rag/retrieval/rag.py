@@ -1,54 +1,49 @@
 from langchain_anthropic import ChatAnthropic
 from langchain.schema import Document, HumanMessage, SystemMessage
 from langchain.prompts import PromptTemplate
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any
 import logging
 from datetime import datetime
+import streamlit as st
 
-from .vector_store import VectorStoreManager, SearchFilters
+from personal_rag.retrieval.vector_store import VectorStoreManager
 
 logger = logging.getLogger(__name__)
 
 
 class RAGPipeline:
-    """Complete RAG pipeline using Anthropic Claude and vector search."""
-
     def __init__(
         self,
-        anthropic_api_key: str,
         vector_store_manager: VectorStoreManager,
-        model_name: str = "claude-3-haiku-20240307",
-        temperature: float = 0.1,
-        max_tokens: int = 1000,
+        model_name: str,
+        temperature: float,
+        max_tokens: int,
+        system_prompt_path: str,
+        query_prompt_path: str,
     ):
-        self.vector_store = vector_store_manager
+        with st.spinner("Initializing RAG pipeline..."):
+            self.vector_store = vector_store_manager
 
-        # Initialize Claude
-        self.llm = ChatAnthropic(
-            anthropic_api_key=anthropic_api_key,
-            model=model_name,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
+            self.llm = ChatAnthropic(
+                model=model_name,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
 
-        # System prompt for RAG
-        self.system_prompt = open(
-            "personal_rag/retrieval/prompts/rag_system_prompt.txt"
-        ).read()
+            self.system_prompt = open(system_prompt_path).read()
 
-        # Query templates
-        self.query_prompt = PromptTemplate(
-            input_variables=["question", "context", "metadata"],
-            template=open("personal_rag/retrieval/prompts/rag_query_prompt.txt").read(),
-        )
+            self.query_prompt = PromptTemplate(
+                input_variables=["question", "context", "metadata"],
+                template=open(query_prompt_path).read(),
+            )
 
     def query(
         self,
         question: str,
         k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: dict[str, Any] | None = None,
         include_metadata: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Query the RAG system with a question.
 
@@ -122,7 +117,7 @@ class RAGPipeline:
                 },
             }
 
-    def _format_context(self, results: List[Tuple[Document, float]]) -> str:
+    def _format_context(self, results: list[tuple[Document, float]]) -> str:
         """Format retrieved documents as context for the LLM."""
         context_parts = []
 
@@ -142,7 +137,7 @@ class RAGPipeline:
 
         return "\n" + "=" * 80 + "\n".join(context_parts)
 
-    def _format_metadata(self, results: List[Tuple[Document, float]]) -> str:
+    def _format_metadata(self, results: list[tuple[Document, float]]) -> str:
         """Format document metadata for the LLM."""
         metadata_parts = []
 
@@ -167,8 +162,8 @@ class RAGPipeline:
         return "\n\n".join(metadata_parts)
 
     def _extract_sources(
-        self, results: List[Tuple[Document, float]]
-    ) -> List[Dict[str, Any]]:
+        self, results: list[tuple[Document, float]]
+    ) -> list[dict[str, Any]]:
         """Extract source information from retrieved documents."""
         sources = []
         seen_docs = set()
@@ -193,8 +188,8 @@ class RAGPipeline:
         return sources
 
     def search_documents(
-        self, query: str, k: int = 10, filters: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        self, query: str, k: int = 10, filters: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """
         Search for documents without generating an answer.
         Useful for exploration and document discovery.
@@ -228,7 +223,7 @@ class RAGPipeline:
             logger.error(f"Error in document search: {str(e)}")
             return []
 
-    def get_document_content(self, doc_id: str) -> Optional[Dict[str, Any]]:
+    def get_document_content(self, doc_id: str) -> dict[str, Any] | None:
         """Get full content of a specific document."""
         try:
             chunks = self.vector_store.get_document_by_id(doc_id)
@@ -259,52 +254,3 @@ class RAGPipeline:
         except Exception as e:
             logger.error(f"Error retrieving document {doc_id}: {str(e)}")
             return None
-
-
-class QueryBuilder:
-    """Helper class for building complex queries and filters."""
-
-    @staticmethod
-    def build_research_query(
-        topic: str,
-        content_type: Optional[str] = None,
-        author: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        date_range: Optional[Tuple[str, str]] = None,
-    ) -> Tuple[str, Optional[Dict[str, Any]]]:
-        """
-        Build a research query with filters.
-
-        Returns:
-            Tuple of (query_string, filters_dict)
-        """
-        # Build query string
-        query_parts = [topic]
-
-        if content_type:
-            query_parts.append(f"type:{content_type}")
-
-        if tags:
-            query_parts.extend(f"tag:{tag}" for tag in tags)
-
-        query = " ".join(query_parts)
-
-        # Build filters
-        filters = []
-
-        if content_type:
-            filters.append(SearchFilters.by_content_type(content_type))
-
-        if author:
-            filters.append(SearchFilters.by_author(author))
-
-        if tags:
-            for tag in tags:
-                filters.append(SearchFilters.by_tag(tag))
-
-        if date_range:
-            filters.append(SearchFilters.by_date_range(date_range[0], date_range[1]))
-
-        combined_filters = SearchFilters.combine_filters(*filters) if filters else None
-
-        return query, combined_filters
