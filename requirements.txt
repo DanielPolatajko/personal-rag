@@ -4,3 +4,9 @@ chromadb==1.0.10
 beautifulsoup4==4.13.4
 requests==2.32.3
 streamlit==1.45.1
+newspaper4k==0.9.3.1
+readability-lxml==0.8.1
+langchain-chroma==0.2.4
+langchain-huggingface==0.2.0
+lxml-html-clean==0.4.2
+python-dotenv==1.1.0

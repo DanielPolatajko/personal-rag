@@ -23,6 +23,6 @@
         "ghcr.io/devcontainers-contrib/features/pipenv:2": {}
     },
     "remoteEnv": {
-        "PYTHONPATH": "${containerWorkspaceFolder}"
+        "PYTHONPATH": "${containerWorkspaceFolder}/personal_rag:${containerWorkspaceFolder}"
     }
 }
