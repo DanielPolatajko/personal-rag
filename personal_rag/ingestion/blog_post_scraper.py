@@ -1,0 +1,285 @@
+import requests
+from bs4 import BeautifulSoup
+from newspaper import Article
+from readability import Document
+from urllib.parse import urlparse
+from typing import Dict, Optional, List
+import time
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class BlogScraper:
+    """Enhanced blog post scraper with multiple extraction methods."""
+
+    def __init__(self, timeout: int = 30, user_agent: str = "RAG Research Bot 1.0"):
+        self.timeout = timeout
+        self.headers = {
+            "User-Agent": user_agent,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive",
+        }
+
+    def scrape_blog_post(self, url: str) -> Optional[Dict[str, str]]:
+        """
+        Scrape a blog post using multiple methods for best results.
+        Returns structured content or None if extraction fails.
+        """
+        try:
+            # Try newspaper3k first (best for articles)
+            article_data = self._extract_with_newspaper(url)
+            if article_data and self._is_valid_content(article_data["content"]):
+                return article_data
+
+            # Fallback to readability + BeautifulSoup
+            readability_data = self._extract_with_readability(url)
+            if readability_data and self._is_valid_content(readability_data["content"]):
+                return readability_data
+
+            # Last resort: basic BeautifulSoup
+            basic_data = self._extract_with_beautifulsoup(url)
+            if basic_data and self._is_valid_content(basic_data["content"]):
+                return basic_data
+
+            logger.warning(f"All extraction methods failed for {url}")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error scraping {url}: {str(e)}")
+            return None
+
+    def _extract_with_newspaper(self, url: str) -> Optional[Dict[str, str]]:
+        """Extract content using newspaper3k library."""
+        try:
+            article = Article(url)
+            article.download()
+            article.parse()
+
+            # Try to extract publish date
+            publish_date = None
+            if article.publish_date:
+                publish_date = article.publish_date.isoformat()
+
+            return {
+                "url": url,
+                "title": article.title or self._extract_title_from_url(url),
+                "content": article.text,
+                "authors": article.authors,
+                "publish_date": publish_date,
+                "summary": article.summary if hasattr(article, "summary") else "",
+                "tags": list(article.tags) if article.tags else [],
+                "extraction_method": "newspaper3k",
+                "scraped_at": datetime.now().isoformat(),
+            }
+        except Exception as e:
+            logger.debug(f"Newspaper extraction failed for {url}: {str(e)}")
+            return None
+
+    def _extract_with_readability(self, url: str) -> Optional[Dict[str, str]]:
+        """Extract content using readability library."""
+        try:
+            response = requests.get(url, headers=self.headers, timeout=self.timeout)
+            response.raise_for_status()
+
+            doc = Document(response.text)
+            soup = BeautifulSoup(doc.content(), "html.parser")
+
+            # Extract text content
+            content = soup.get_text(separator="\n", strip=True)
+
+            # Try to get title from original page
+            original_soup = BeautifulSoup(response.text, "html.parser")
+            title = self._extract_title(original_soup) or doc.title()
+
+            return {
+                "url": url,
+                "title": title or self._extract_title_from_url(url),
+                "content": content,
+                "authors": self._extract_authors(original_soup),
+                "publish_date": self._extract_publish_date(original_soup),
+                "summary": content[:500] + "..." if len(content) > 500 else content,
+                "tags": self._extract_tags(original_soup),
+                "extraction_method": "readability",
+                "scraped_at": datetime.now().isoformat(),
+            }
+        except Exception as e:
+            logger.debug(f"Readability extraction failed for {url}: {str(e)}")
+            return None
+
+    def _extract_with_beautifulsoup(self, url: str) -> Optional[Dict[str, str]]:
+        """Basic extraction using BeautifulSoup."""
+        try:
+            response = requests.get(url, headers=self.headers, timeout=self.timeout)
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            # Remove script and style elements
+            for script in soup(["script", "style", "nav", "footer", "header", "aside"]):
+                script.decompose()
+
+            # Try to find main content areas
+            content_selectors = [
+                "article",
+                "main",
+                ".content",
+                ".post-content",
+                ".entry-content",
+                ".post-body",
+                ".article-content",
+            ]
+
+            content = ""
+            for selector in content_selectors:
+                content_element = soup.select_one(selector)
+                if content_element:
+                    content = content_element.get_text(separator="\n", strip=True)
+                    break
+
+            # Fallback to body if no specific content area found
+            if not content:
+                body = soup.find("body")
+                if body:
+                    content = body.get_text(separator="\n", strip=True)
+
+            return {
+                "url": url,
+                "title": self._extract_title(soup) or self._extract_title_from_url(url),
+                "content": content,
+                "authors": self._extract_authors(soup),
+                "publish_date": self._extract_publish_date(soup),
+                "summary": content[:500] + "..." if len(content) > 500 else content,
+                "tags": self._extract_tags(soup),
+                "extraction_method": "beautifulsoup",
+                "scraped_at": datetime.now().isoformat(),
+            }
+        except Exception as e:
+            logger.debug(f"BeautifulSoup extraction failed for {url}: {str(e)}")
+            return None
+
+    def _extract_title(self, soup: BeautifulSoup) -> Optional[str]:
+        """Extract title from HTML."""
+        # Try different title sources
+        title_selectors = [
+            "h1.title",
+            "h1.post-title",
+            "h1.entry-title",
+            "h1.article-title",
+            ".post-title h1",
+            "h1",
+        ]
+
+        for selector in title_selectors:
+            title_element = soup.select_one(selector)
+            if title_element and title_element.get_text(strip=True):
+                return title_element.get_text(strip=True)
+
+        # Fallback to page title
+        title_tag = soup.find("title")
+        if title_tag:
+            return title_tag.get_text(strip=True)
+
+        return None
+
+    def _extract_authors(self, soup: BeautifulSoup) -> List[str]:
+        """Extract author information."""
+        author_selectors = [
+            ".author",
+            ".byline",
+            ".post-author",
+            '[rel="author"]',
+            ".entry-author",
+        ]
+
+        authors = []
+        for selector in author_selectors:
+            author_elements = soup.select(selector)
+            for element in author_elements:
+                author_text = element.get_text(strip=True)
+                if author_text and author_text not in authors:
+                    authors.append(author_text)
+
+        return authors
+
+    def _extract_publish_date(self, soup: BeautifulSoup) -> Optional[str]:
+        """Extract publication date."""
+        date_selectors = [
+            "time[datetime]",
+            ".publish-date",
+            ".post-date",
+            ".entry-date",
+            '[property="article:published_time"]',
+        ]
+
+        for selector in date_selectors:
+            date_element = soup.select_one(selector)
+            if date_element:
+                # Try datetime attribute first
+                datetime_attr = date_element.get("datetime")
+                if datetime_attr:
+                    return datetime_attr
+
+                # Try content attribute
+                content_attr = date_element.get("content")
+                if content_attr:
+                    return content_attr
+
+                # Try text content
+                date_text = date_element.get_text(strip=True)
+                if date_text:
+                    return date_text
+
+        return None
+
+    def _extract_tags(self, soup: BeautifulSoup) -> List[str]:
+        """Extract tags/categories."""
+        tag_selectors = [
+            ".tags a",
+            ".post-tags a",
+            ".entry-tags a",
+            ".categories a",
+            '[rel="tag"]',
+        ]
+
+        tags = []
+        for selector in tag_selectors:
+            tag_elements = soup.select(selector)
+            for element in tag_elements:
+                tag_text = element.get_text(strip=True)
+                if tag_text and tag_text not in tags:
+                    tags.append(tag_text)
+
+        return tags
+
+    def _extract_title_from_url(self, url: str) -> str:
+        """Generate a title from URL as fallback."""
+        parsed = urlparse(url)
+        path = parsed.path.strip("/").replace("-", " ").replace("_", " ")
+        if path:
+            return path.split("/")[-1].title()
+        return parsed.netloc
+
+    def _is_valid_content(self, content: str) -> bool:
+        """Check if extracted content is valid."""
+        if not content or len(content.strip()) < 100:
+            return False
+
+        # Check for common error indicators
+        error_indicators = [
+            "access denied",
+            "page not found",
+            "404 error",
+            "javascript required",
+            "enable javascript",
+        ]
+
+        content_lower = content.lower()
+        for indicator in error_indicators:
+            if indicator in content_lower:
+                return False
+
+        return True
