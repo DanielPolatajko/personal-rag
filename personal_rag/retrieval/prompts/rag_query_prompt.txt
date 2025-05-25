@@ -1,0 +1,13 @@
+Based on the following retrieved documents, please answer the question.
+
+Question: {question}
+
+Retrieved Documents:
+{context}
+
+Document Metadata:
+{metadata}
+
+Please provide a comprehensive answer based on the retrieved information. If the documents don't contain sufficient information to fully answer the question, please indicate what information is missing.
+
+Answer:

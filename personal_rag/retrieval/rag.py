@@ -32,35 +32,14 @@ class RAGPipeline:
         )
 
         # System prompt for RAG
-        self.system_prompt = """You are a helpful research assistant with access to a curated collection of blog posts and research papers. Your role is to provide accurate, well-sourced answers based on the retrieved documents.
-
-Guidelines:
-1. Base your answers primarily on the provided context documents
-2. Clearly cite sources by mentioning the document title and authors when available
-3. If the context doesn't contain enough information to answer the question, say so
-4. Distinguish between information from the documents vs. your general knowledge
-5. Provide specific quotes or references when helpful
-6. If multiple sources discuss the same topic, synthesize the information coherently
-7. For technical topics, explain concepts clearly while maintaining accuracy
-
-Remember: You're helping someone research climate tech, AI safety, and related technical fields."""
+        self.system_prompt = open(
+            "personal_rag/retrieval/prompts/rag_system_prompt.txt"
+        ).read()
 
         # Query templates
         self.query_prompt = PromptTemplate(
             input_variables=["question", "context", "metadata"],
-            template="""Based on the following retrieved documents, please answer the question.
-
-Question: {question}
-
-Retrieved Documents:
-{context}
-
-Document Metadata:
-{metadata}
-
-Please provide a comprehensive answer based on the retrieved information. If the documents don't contain sufficient information to fully answer the question, please indicate what information is missing.
-
-Answer:""",
+            template=open("personal_rag/retrieval/prompts/rag_query_prompt.txt").read(),
         )
 
     def query(
