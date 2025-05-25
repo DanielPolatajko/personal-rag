@@ -11,7 +11,6 @@ from personal_rag.ingestion.document_processor import (
 )
 from personal_rag.retrieval.vector_store import VectorStoreManager
 from personal_rag.retrieval.rag import RAGPipeline
-from personal_rag.utils.config import load_config
 from personal_rag.container import Container
 
 from dotenv import load_dotenv
@@ -41,7 +40,6 @@ class RAGApp:
     ):
         self.vector_store_manager = vector_store_manager
         self.rag_pipeline = rag_pipeline
-        self.config = load_config()
         self.initialize_session_state()
 
     def initialize_session_state(self):
