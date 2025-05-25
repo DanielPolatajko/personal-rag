@@ -22,7 +22,7 @@ class RAGPipeline:
         query_prompt_path: str,
     ):
         with st.spinner("Initializing RAG pipeline..."):
-            self.vector_store = vector_store_manager
+            self.vector_store_manager = vector_store_manager
 
             self.llm = ChatAnthropic(
                 model=model_name,
@@ -58,8 +58,10 @@ class RAGPipeline:
         """
         try:
             # Retrieve relevant documents
-            results = self.vector_store.similarity_search_with_score(
-                query=question, k=k, filter_dict=filters
+            results = (
+                self.vector_store_manager.vector_store.similarity_search_with_score(
+                    query=question, k=k, filter_dict=filters
+                )
             )
 
             if not results:
@@ -195,8 +197,10 @@ class RAGPipeline:
         Useful for exploration and document discovery.
         """
         try:
-            results = self.vector_store.similarity_search_with_score(
-                query=query, k=k, filter_dict=filters
+            results = (
+                self.vector_store_manager.vector_store.similarity_search_with_score(
+                    query=query, k=k, filter_dict=filters
+                )
             )
 
             search_results = []
@@ -226,7 +230,7 @@ class RAGPipeline:
     def get_document_content(self, doc_id: str) -> dict[str, Any] | None:
         """Get full content of a specific document."""
         try:
-            chunks = self.vector_store.get_document_by_id(doc_id)
+            chunks = self.vector_store_manager.get_document_by_id(doc_id)
 
             if not chunks:
                 return None

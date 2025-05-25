@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import datetime
 import logging
-from typing import Dict, Any, Optional
+from typing import Any
 from dependency_injector.wiring import inject, Provide
 
 from personal_rag.ingestion.blog_post_scraper import BlogScraper
@@ -15,13 +15,11 @@ from personal_rag.container import Container
 
 from dotenv import load_dotenv
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-# Page config
 st.set_page_config(
     page_title="Personal RAG Research Assistant",
     page_icon="🔬",
@@ -31,8 +29,6 @@ st.set_page_config(
 
 
 class RAGApp:
-    """Main Streamlit RAG application."""
-
     def __init__(
         self,
         vector_store_manager: VectorStoreManager,
@@ -368,7 +364,7 @@ class RAGApp:
         else:
             st.info("No ingestion activity yet.")
 
-    def _build_filters(self, settings: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _build_filters(self, settings: dict[str, Any]) -> dict[str, Any] | None:
         """Build search filters from settings."""
         from retrieval.vector_store import SearchFilters
 

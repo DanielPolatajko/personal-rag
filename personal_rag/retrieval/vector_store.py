@@ -263,39 +263,6 @@ class VectorStoreManager:
             logger.error(f"Error performing similarity search: {str(e)}")
             return []
 
-    def similarity_search_with_score(
-        self, query: str, k: int = 5, filter_dict: dict[str, Any] | None = None
-    ) -> list[tuple[Document, float]]:
-        """
-        Search for similar documents with similarity scores.
-
-        Args:
-            query: Search query string
-            k: Number of results to return
-            filter_dict: Optional metadata filters
-
-        Returns:
-            List of (Document, score) tuples
-        """
-        try:
-            if filter_dict:
-                results = self.vector_store.similarity_search_with_score(
-                    query=query, k=k, filter=filter_dict
-                )
-            else:
-                results = self.vector_store.similarity_search_with_score(
-                    query=query, k=k
-                )
-
-            logger.debug(
-                f"Found {len(results)} scored results for query: {query[:100]}..."
-            )
-            return results
-
-        except Exception as e:
-            logger.error(f"Error performing scored similarity search: {str(e)}")
-            return []
-
     def get_document_by_id(self, doc_id: str) -> list[Document]:
         """Get all chunks for a specific document ID."""
         try:
