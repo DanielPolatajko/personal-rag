@@ -1,0 +1,16 @@
+{
+    "configurations": [
+        {
+            "name": "Python Debugger: Personal RAG",
+            "type": "debugpy",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "module": "streamlit",
+            "args": [
+                "run",
+                "${workspaceFolder}/personal_rag/main.py"
+            ],
+            "justMyCode": true
+        }
+    ]
+}
