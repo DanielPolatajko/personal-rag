@@ -10,8 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class BlogScraper:
-    """Enhanced blog post scraper with multiple extraction methods."""
-
     def __init__(self, timeout: int, user_agent: str):
         self.timeout = timeout
         self.headers = {
@@ -28,17 +26,14 @@ class BlogScraper:
         Returns structured content or None if extraction fails.
         """
         try:
-            # Try newspaper3k first (best for articles)
             article_data = self._extract_with_newspaper(url)
             if article_data and self._is_valid_content(article_data["content"]):
                 return article_data
 
-            # Fallback to readability + BeautifulSoup
             readability_data = self._extract_with_readability(url)
             if readability_data and self._is_valid_content(readability_data["content"]):
                 return readability_data
 
-            # Last resort: basic BeautifulSoup
             basic_data = self._extract_with_beautifulsoup(url)
             if basic_data and self._is_valid_content(basic_data["content"]):
                 return basic_data
@@ -51,13 +46,11 @@ class BlogScraper:
             return None
 
     def _extract_with_newspaper(self, url: str) -> dict[str, str] | None:
-        """Extract content using newspaper3k library."""
         try:
             article = Article(url)
             article.download()
             article.parse()
 
-            # Try to extract publish date
             publish_date = None
             if article.publish_date:
                 publish_date = article.publish_date.isoformat()
@@ -78,7 +71,6 @@ class BlogScraper:
             return None
 
     def _extract_with_readability(self, url: str) -> dict[str, str] | None:
-        """Extract content using readability library."""
         try:
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
             response.raise_for_status()
@@ -86,10 +78,8 @@ class BlogScraper:
             doc = Document(response.text)
             soup = BeautifulSoup(doc.content(), "html.parser")
 
-            # Extract text content
             content = soup.get_text(separator="\n", strip=True)
 
-            # Try to get title from original page
             original_soup = BeautifulSoup(response.text, "html.parser")
             title = self._extract_title(original_soup) or doc.title()
 
@@ -109,18 +99,15 @@ class BlogScraper:
             return None
 
     def _extract_with_beautifulsoup(self, url: str) -> dict[str, str] | None:
-        """Basic extraction using BeautifulSoup."""
         try:
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
             response.raise_for_status()
 
             soup = BeautifulSoup(response.text, "html.parser")
 
-            # Remove script and style elements
             for script in soup(["script", "style", "nav", "footer", "header", "aside"]):
                 script.decompose()
 
-            # Try to find main content areas
             content_selectors = [
                 "article",
                 "main",
@@ -138,7 +125,6 @@ class BlogScraper:
                     content = content_element.get_text(separator="\n", strip=True)
                     break
 
-            # Fallback to body if no specific content area found
             if not content:
                 body = soup.find("body")
                 if body:
@@ -160,8 +146,6 @@ class BlogScraper:
             return None
 
     def _extract_title(self, soup: BeautifulSoup) -> str | None:
-        """Extract title from HTML."""
-        # Try different title sources
         title_selectors = [
             "h1.title",
             "h1.post-title",
@@ -176,7 +160,6 @@ class BlogScraper:
             if title_element and title_element.get_text(strip=True):
                 return title_element.get_text(strip=True)
 
-        # Fallback to page title
         title_tag = soup.find("title")
         if title_tag:
             return title_tag.get_text(strip=True)
@@ -184,7 +167,6 @@ class BlogScraper:
         return None
 
     def _extract_authors(self, soup: BeautifulSoup) -> list[str]:
-        """Extract author information."""
         author_selectors = [
             ".author",
             ".byline",
@@ -204,7 +186,6 @@ class BlogScraper:
         return authors
 
     def _extract_publish_date(self, soup: BeautifulSoup) -> str | None:
-        """Extract publication date."""
         date_selectors = [
             "time[datetime]",
             ".publish-date",
@@ -216,17 +197,14 @@ class BlogScraper:
         for selector in date_selectors:
             date_element = soup.select_one(selector)
             if date_element:
-                # Try datetime attribute first
                 datetime_attr = date_element.get("datetime")
                 if datetime_attr:
                     return datetime_attr
 
-                # Try content attribute
                 content_attr = date_element.get("content")
                 if content_attr:
                     return content_attr
 
-                # Try text content
                 date_text = date_element.get_text(strip=True)
                 if date_text:
                     return date_text
@@ -234,7 +212,6 @@ class BlogScraper:
         return None
 
     def _extract_tags(self, soup: BeautifulSoup) -> list[str]:
-        """Extract tags/categories."""
         tag_selectors = [
             ".tags a",
             ".post-tags a",
@@ -254,7 +231,6 @@ class BlogScraper:
         return tags
 
     def _extract_title_from_url(self, url: str) -> str:
-        """Generate a title from URL as fallback."""
         parsed = urlparse(url)
         path = parsed.path.strip("/").replace("-", " ").replace("_", " ")
         if path:
@@ -262,7 +238,6 @@ class BlogScraper:
         return parsed.netloc
 
     def _is_valid_content(self, content: str) -> bool:
-        """Check if extracted content is valid."""
         if not content or len(content.strip()) < 100:
             return False
 

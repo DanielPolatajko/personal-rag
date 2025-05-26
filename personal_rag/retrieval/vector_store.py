@@ -3,7 +3,7 @@ from chromadb.config import Settings
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.schema import Document
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any
 import logging
 from pathlib import Path
 import streamlit as st
