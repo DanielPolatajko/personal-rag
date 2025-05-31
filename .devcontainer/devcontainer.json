@@ -1,7 +1,10 @@
 {
     "name": "Personal RAG Agent",
-    "image": "python:3.13",
-    "postCreateCommand": "pip install uv && uv pip install -r requirements.txt --system",
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "target": "dev",
+        "context": ".."
+    },
     "customizations": {
         "vscode": {
             "extensions": [
@@ -19,10 +22,12 @@
         }
     },
     "features": {
-        "ghcr.io/devcontainers/features/github-cli:1": {},
-        "ghcr.io/devcontainers-contrib/features/pipenv:2": {}
+        "ghcr.io/devcontainers/features/github-cli:1": {}
     },
     "remoteEnv": {
         "PYTHONPATH": "${containerWorkspaceFolder}/personal_rag:${containerWorkspaceFolder}"
-    }
+    },
+    "mounts": [
+        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+    ]
 }

@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 import streamlit as st
 
-from personal_rag.retrieval.vector_store import VectorStoreManager
+from personal_rag.vector_store.chroma import ChromaVectorStoreManager
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class RAGPipeline:
     def __init__(
         self,
-        vector_store_manager: VectorStoreManager,
+        vector_store_manager: ChromaVectorStoreManager,
         model_name: str,
         temperature: float,
         max_tokens: int,

@@ -1,37 +1,31 @@
 import chromadb
 from chromadb.config import Settings
 from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.schema import Document
-from typing import Any
+from typing import Any, List, Dict, Optional
 import logging
 from pathlib import Path
 import streamlit as st
+from personal_rag.vector_store.vector_store_manager import BaseVectorStoreManager
+from personal_rag.embeddings.embeddings_client import BaseEmbeddingsClient
 
 logger = logging.getLogger(__name__)
 
 
-class VectorStoreManager:
+class ChromaVectorStoreManager(BaseVectorStoreManager):
     def __init__(
         self,
         persist_directory: str,
-        embedding_model: str,
+        embeddings_client: BaseEmbeddingsClient,
         collection_name: str,
     ):
         with st.spinner("Initializing vector store..."):
             self.persist_directory = Path(persist_directory)
             self.collection_name = collection_name
+            self.embeddings_client = embeddings_client
 
             # Create directory if it doesn't exist
             self.persist_directory.mkdir(parents=True, exist_ok=True)
-
-            # Initialize embeddings (CPU-only)
-            logger.info(f"Loading embedding model: {embedding_model}")
-            self.embeddings = HuggingFaceEmbeddings(
-                model_name=embedding_model,
-                model_kwargs={"device": "cpu"},  # Force CPU usage
-                encode_kwargs={"normalize_embeddings": True},
-            )
 
             # Initialize Chroma client
             self.chroma_client = chromadb.PersistentClient(
@@ -48,7 +42,7 @@ class VectorStoreManager:
             self.vector_store = Chroma(
                 client=self.chroma_client,
                 collection_name=self.collection_name,
-                embedding_function=self.embeddings,
+                embedding_function=self.embeddings_client.embeddings,
                 persist_directory=str(self.persist_directory),
             )
             logger.info(
@@ -263,29 +257,29 @@ class VectorStoreManager:
             logger.error(f"Error performing similarity search: {str(e)}")
             return []
 
-    def get_document_by_id(self, doc_id: str) -> list[Document]:
+    def get_document_by_id(self, doc_id: str) -> List[Document]:
         """Get all chunks for a specific document ID."""
         try:
             results = self.vector_store.get(where={"doc_id": doc_id})
 
+            if not results["ids"]:
+                logger.warning(f"No chunks found for document {doc_id}")
+                return []
+
+            # Convert to Document objects
             documents = []
-            if results["ids"]:
-                for i, chunk_id in enumerate(results["ids"]):
-                    doc = Document(
-                        page_content=results["documents"][i],
-                        metadata=results["metadatas"][i],
-                    )
-                    documents.append(doc)
+            for i, chunk_id in enumerate(results["ids"]):
+                doc = Document(
+                    page_content=results["documents"][i],
+                    metadata=results["metadatas"][i],
+                )
+                documents.append(doc)
 
-            # Sort by chunk index
-            documents.sort(key=lambda x: x.metadata.get("chunk_index", 0))
-
-            logger.debug(f"Retrieved {len(documents)} chunks for document {doc_id}")
             return documents
 
         except Exception as e:
-            logger.error(f"Error retrieving document {doc_id}: {str(e)}")
-            raise e
+            logger.error(f"Error getting document {doc_id}: {str(e)}")
+            return []
 
 
 class SearchFilters:

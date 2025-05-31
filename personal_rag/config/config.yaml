@@ -1,6 +1,13 @@
-vector_store:
+embeddings:
+  huggingface:
+    model_name: sentence-transformers/all-MiniLM-L6-v2
+
+  gemini:
+    api_key: GEMINI_API_KEY
+    model: "text-embedding-004"
+
+chroma_vector_store:
   persist_directory: ./data/vectorstore
-  embedding_model: sentence-transformers/all-MiniLM-L6-v2
   collection_name: research_documents
 
 rag:
@@ -17,3 +24,6 @@ blog_scraper:
 document_processor:
   chunk_size: 1000
   chunk_overlap: 200
+
+lancedb_vector_store:
+  db_path: VECTOR_STORE_BUCKET_PATH

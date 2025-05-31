@@ -1,22 +1,31 @@
 from dependency_injector import containers, providers
-from personal_rag.retrieval.vector_store import VectorStoreManager
+from vector_store.chroma import ChromaVectorStoreManager
 from personal_rag.retrieval.rag import RAGPipeline
 from personal_rag.ingestion.blog_post_scraper import BlogScraper
 from personal_rag.ingestion.document_processor import DocumentProcessor
+from personal_rag.embeddings.gemini import GeminiEmbeddingClient
+from personal_rag.embeddings.huggingface import HuggingFaceEmbeddingsClient
+from vector_store.lancedb import LanceDBVectorStoreManager
 
 
 class Container(containers.DeclarativeContainer):
     config = providers.Configuration()
-    vector_store_manager = providers.Singleton(
-        VectorStoreManager,
-        persist_directory=config.vector_store.persist_directory,
-        embedding_model=config.vector_store.embedding_model,
-        collection_name=config.vector_store.collection_name,
+
+    huggingface_embeddings_client = providers.Singleton(
+        HuggingFaceEmbeddingsClient,
+        model_name=config.embeddings.huggingface.model_name,
+    )
+
+    chroma_vector_store_manager = providers.Singleton(
+        ChromaVectorStoreManager,
+        persist_directory=config.chroma_vector_store.persist_directory,
+        embeddings_client=huggingface_embeddings_client,
+        collection_name=config.chroma_vector_store.collection_name,
     )
 
     rag_pipeline = providers.Singleton(
         RAGPipeline,
-        vector_store_manager=vector_store_manager,
+        vector_store_manager=chroma_vector_store_manager,
         model_name=config.rag.model_name,
         temperature=config.rag.temperature,
         max_tokens=config.rag.max_tokens,
@@ -34,4 +43,16 @@ class Container(containers.DeclarativeContainer):
         DocumentProcessor,
         chunk_size=config.document_processor.chunk_size,
         chunk_overlap=config.document_processor.chunk_overlap,
+    )
+
+    gemini_embedding = providers.Singleton(
+        GeminiEmbeddingClient,
+        api_key=config.embeddings.gemini.api_key,
+        model=config.embeddings.gemini.model,
+    )
+
+    lancedb_vector_store_manager = providers.Singleton(
+        LanceDBVectorStoreManager,
+        db_path=config.lancedb_vector_store.db_path,
+        embedding_client=gemini_embedding,
     )

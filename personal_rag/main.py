@@ -19,7 +19,7 @@ def main():
         logger.info("Configurations loaded successfully")
         logger.info("Initializing RAG application...")
         app = RAGApp(
-            vector_store_manager=container.vector_store_manager(),
+            vector_store_manager=container.chroma_vector_store_manager(),
             rag_pipeline=container.rag_pipeline(),
         )
         logger.info("RAG application initialized successfully")

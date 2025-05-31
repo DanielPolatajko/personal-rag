@@ -9,7 +9,7 @@ from personal_rag.ingestion.document_processor import (
     DocumentProcessor,
     DocumentValidator,
 )
-from personal_rag.retrieval.vector_store import VectorStoreManager
+from retrieval.chroma import ChromaVectorStoreManager
 from personal_rag.retrieval.rag import RAGPipeline
 from personal_rag.container import Container
 
@@ -31,7 +31,7 @@ st.set_page_config(
 class RAGApp:
     def __init__(
         self,
-        vector_store_manager: VectorStoreManager,
+        vector_store_manager: ChromaVectorStoreManager,
         rag_pipeline: RAGPipeline,
     ):
         self.vector_store_manager = vector_store_manager
@@ -366,7 +366,7 @@ class RAGApp:
 
     def _build_filters(self, settings: dict[str, Any]) -> dict[str, Any] | None:
         """Build search filters from settings."""
-        from retrieval.vector_store import SearchFilters
+        from retrieval.chroma import SearchFilters
 
         filters = []
 
