@@ -3,11 +3,12 @@ version: '3.8'
 services:
   rag:
     build: .
+    target: base
     ports:
       - "8501:8501"
     volumes:
       - .:/app
       - ./data:/app/data
-    environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    env_file:
+      - .env
     restart: unless-stopped 
