@@ -3,7 +3,7 @@ embeddings:
     model_name: sentence-transformers/all-MiniLM-L6-v2
 
   gemini:
-    api_key: GEMINI_API_KEY
+    api_key: ${GEMINI_API_KEY}
     model: "text-embedding-004"
 
 chroma_vector_store:
@@ -26,4 +26,4 @@ document_processor:
   chunk_overlap: 200
 
 lancedb_vector_store:
-  db_path: VECTOR_STORE_BUCKET_PATH
+  db_path: ${VECTOR_STORE_BUCKET_PATH}

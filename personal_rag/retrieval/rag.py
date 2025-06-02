@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 import streamlit as st
 
-from personal_rag.vector_store.chroma import ChromaVectorStoreManager
+from personal_rag.vector_store import BaseVectorStoreManager
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class RAGPipeline:
     def __init__(
         self,
-        vector_store_manager: ChromaVectorStoreManager,
+        vector_store_manager: BaseVectorStoreManager,
         model_name: str,
         temperature: float,
         max_tokens: int,
@@ -58,10 +58,8 @@ class RAGPipeline:
         """
         try:
             # Retrieve relevant documents
-            results = (
-                self.vector_store_manager.vector_store.similarity_search_with_score(
-                    query=question, k=k, filter_dict=filters
-                )
+            results = self.vector_store_manager.similarity_search(
+                query=question, k=k, filter_dict=filters, with_score=True
             )
 
             if not results:
@@ -197,10 +195,8 @@ class RAGPipeline:
         Useful for exploration and document discovery.
         """
         try:
-            results = (
-                self.vector_store_manager.vector_store.similarity_search_with_score(
-                    query=query, k=k, filter_dict=filters
-                )
+            results = self.vector_store_manager.similarity_search(
+                query=query, k=k, filter_dict=filters, with_score=True
             )
 
             search_results = []

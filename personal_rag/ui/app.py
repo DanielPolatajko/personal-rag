@@ -2,14 +2,13 @@ import streamlit as st
 from datetime import datetime
 import logging
 from typing import Any
-from dependency_injector.wiring import inject, Provide
 
 from personal_rag.ingestion.blog_post_scraper import BlogScraper
 from personal_rag.ingestion.document_processor import (
     DocumentProcessor,
     DocumentValidator,
 )
-from retrieval.chroma import ChromaVectorStoreManager
+from personal_rag.vector_store import BaseVectorStoreManager, SearchFilters
 from personal_rag.retrieval.rag import RAGPipeline
 from personal_rag.container import Container
 
@@ -31,11 +30,15 @@ st.set_page_config(
 class RAGApp:
     def __init__(
         self,
-        vector_store_manager: ChromaVectorStoreManager,
+        vector_store_manager: BaseVectorStoreManager,
         rag_pipeline: RAGPipeline,
+        blog_scraper: BlogScraper,
+        document_processor: DocumentProcessor,
     ):
         self.vector_store_manager = vector_store_manager
         self.rag_pipeline = rag_pipeline
+        self.blog_scraper = blog_scraper
+        self.document_processor = document_processor
         self.initialize_session_state()
 
     def initialize_session_state(self):
@@ -366,8 +369,6 @@ class RAGApp:
 
     def _build_filters(self, settings: dict[str, Any]) -> dict[str, Any] | None:
         """Build search filters from settings."""
-        from retrieval.chroma import SearchFilters
-
         filters = []
 
         if settings.get("content_type"):
@@ -382,24 +383,21 @@ class RAGApp:
 
         return SearchFilters.combine_filters(*filters) if filters else None
 
-    @inject
     def _ingest_blog_post(
         self,
         url: str,
-        blog_scraper: BlogScraper = Provide[Container.blog_scraper],
-        document_processor: DocumentProcessor = Provide[Container.document_processor],
     ):
         """Ingest a single blog post."""
         with st.spinner(f"Ingesting {url}..."):
             try:
-                blog_data = blog_scraper.scrape_blog_post(url)
+                blog_data = self.blog_scraper.scrape_blog_post(url)
 
                 if not blog_data:
                     st.error("Failed to scrape blog post. Please check the URL.")
                     self._log_ingestion_status(url, False, "Scraping failed")
                     return
 
-                documents = document_processor.process_blog_post(blog_data)
+                documents = self.document_processor.process_blog_post(blog_data)
                 valid_documents = DocumentValidator.validate_documents(documents)
 
                 if not valid_documents:
