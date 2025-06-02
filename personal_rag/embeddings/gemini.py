@@ -1,6 +1,5 @@
 from google import genai
 from google.genai import types
-from typing import List
 from langchain_core.documents import Document
 from personal_rag.embeddings.embeddings_client import BaseEmbeddingsClient
 
@@ -10,7 +9,7 @@ class GeminiEmbeddingClient(BaseEmbeddingsClient):
         self.client = genai.Client(api_key=api_key)
         self.model = model
 
-    def embed_content(self, contents: str) -> list[float]:
+    def embed_content(self, contents: str) -> list[types.ContentEmbedding]:
         result = self.client.models.embed_content(
             model=self.model,
             contents=contents,
@@ -18,7 +17,9 @@ class GeminiEmbeddingClient(BaseEmbeddingsClient):
         )
         return result.embeddings
 
-    def embed_documents(self, documents: List[Document]) -> List[List[float]]:
+    def embed_documents(
+        self, documents: list[Document]
+    ) -> list[list[types.ContentEmbedding]]:
         """Embed multiple documents.
 
         Args:

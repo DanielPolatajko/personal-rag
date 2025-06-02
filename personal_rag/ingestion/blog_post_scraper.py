@@ -59,7 +59,9 @@ class BlogScraper:
                 "url": url,
                 "title": article.title or self._extract_title_from_url(url),
                 "content": article.text,
-                "authors": article.authors,
+                "authors": article.authors
+                if isinstance(article.authors, list)
+                else [article.authors],
                 "publish_date": publish_date,
                 "summary": article.summary if hasattr(article, "summary") else "",
                 "tags": list(article.tags) if article.tags else [],
@@ -67,7 +69,7 @@ class BlogScraper:
                 "scraped_at": datetime.now().isoformat(),
             }
         except Exception as e:
-            logger.debug(f"Newspaper extraction failed for {url}: {str(e)}")
+            logger.error(f"Newspaper extraction failed for {url}: {str(e)}")
             return None
 
     def _extract_with_readability(self, url: str) -> dict[str, str] | None:
@@ -95,7 +97,7 @@ class BlogScraper:
                 "scraped_at": datetime.now().isoformat(),
             }
         except Exception as e:
-            logger.debug(f"Readability extraction failed for {url}: {str(e)}")
+            logger.error(f"Readability extraction failed for {url}: {str(e)}")
             return None
 
     def _extract_with_beautifulsoup(self, url: str) -> dict[str, str] | None:
@@ -142,7 +144,7 @@ class BlogScraper:
                 "scraped_at": datetime.now().isoformat(),
             }
         except Exception as e:
-            logger.debug(f"BeautifulSoup extraction failed for {url}: {str(e)}")
+            logger.error(f"BeautifulSoup extraction failed for {url}: {str(e)}")
             return None
 
     def _extract_title(self, soup: BeautifulSoup) -> str | None:

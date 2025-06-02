@@ -50,7 +50,7 @@ class LanceDBVectorStoreManager(BaseVectorStoreManager):
         for doc in documents:
             # Generate embedding
             text = doc.page_content
-            embedding = self.embedding_client.embed_content(text)
+            embedding = self.embedding_client.embed_content(text)[0].values
             processed_doc = Article(
                 id=doc.metadata.get("id", ""),
                 text=text,
@@ -58,9 +58,9 @@ class LanceDBVectorStoreManager(BaseVectorStoreManager):
                 doc_id=doc.metadata.get("doc_id", ""),
                 title=doc.metadata.get("title", ""),
                 source=doc.metadata.get("source", ""),
-                authors=doc.metadata.get("authors"),
+                authors=doc.metadata.get("authors", "").split(","),
                 publish_date=doc.metadata.get("publish_date"),
-                tags=doc.metadata.get("tags"),
+                tags=doc.metadata.get("tags", "").split(","),
                 chunk_index=doc.metadata.get("chunk_index"),
                 total_chunks=doc.metadata.get("total_chunks"),
                 content_type=doc.metadata.get("content_type"),
@@ -83,7 +83,7 @@ class LanceDBVectorStoreManager(BaseVectorStoreManager):
         with_score: bool = False,
     ) -> list[tuple[Document, float]]:
         """Search documents using vector similarity"""
-        query_embedding = self.embedding_client.embed_content(query)
+        query_embedding = self.embedding_client.embed_content(query)[0].values
 
         search_results = self.table.search(query_embedding).limit(k)
 
