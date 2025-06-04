@@ -14,6 +14,7 @@ class LanceDBVectorStoreManager(BaseVectorStoreManager):
     def __init__(
         self,
         db_path: str,
+        service_account_path: str,
         embedding_client: GeminiEmbeddingClient,
     ):
         self.db_path = db_path
@@ -24,7 +25,7 @@ class LanceDBVectorStoreManager(BaseVectorStoreManager):
         self.db = lancedb.connect(
             db_path,
             storage_options={
-                "service_account": "/workspaces/personal-rag/personal-rag-461509-328e97a1e449.json"
+                "service_account": service_account_path,
             },
         )
         self.table_name = "documents"
@@ -45,7 +46,7 @@ class LanceDBVectorStoreManager(BaseVectorStoreManager):
             return []
 
         # Process documents and generate embeddings
-        processed_docs = []
+        processed_docs: list[Article] = []
 
         for doc in documents:
             # Generate embedding
@@ -69,11 +70,10 @@ class LanceDBVectorStoreManager(BaseVectorStoreManager):
             processed_docs.append(processed_doc)
 
         # Add to table
-        df = pd.DataFrame(processed_docs)
-        self.table.add(df)
+        self.table.add(processed_docs)
 
         logger.info(f"Added {len(processed_docs)} documents to LanceDB")
-        return [doc["id"] for doc in processed_docs]
+        return [doc.id for doc in processed_docs]
 
     def similarity_search(
         self,
@@ -115,7 +115,7 @@ class LanceDBVectorStoreManager(BaseVectorStoreManager):
                     "content_type": row["content_type"],
                 },
             )
-            documents.append((doc, row["_score"] if with_score else -1.0))
+            documents.append((doc, row["_distance"] if with_score else -1.0))
 
         return documents
 

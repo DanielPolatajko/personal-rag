@@ -30,6 +30,7 @@ class Container(containers.DeclarativeContainer):
     lancedb_vector_store_manager = providers.Singleton(
         LanceDBVectorStoreManager,
         db_path=config.lancedb_vector_store.db_path,
+        service_account_path=config.lancedb_vector_store.service_account_path,
         embedding_client=gemini_embedding,
     )
 

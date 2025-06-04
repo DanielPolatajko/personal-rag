@@ -27,3 +27,4 @@ document_processor:
 
 lancedb_vector_store:
   db_path: ${VECTOR_STORE_BUCKET_PATH}
+  service_account_path: ${GCP_SERVICE_ACCOUNT_PATH}
